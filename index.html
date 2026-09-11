@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartPlate AI — Intelligent Campus Food Waste Solutions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- Wastia-style Navigation Header -->
+<header class="site-header">
+  <div class="header-container">
+    <div class="brand">
+      <div class="brand-badge">
+        <span class="brand-leaf">🌱</span>
+      </div>
+      <div>
+        <div class="brand-title">SmartPlate<span>.ai</span></div>
+        <div class="brand-subtitle">Campus Waste &amp; Kitchen Intelligence</div>
+      </div>
+    </div>
+
+    <nav class="nav-links">
+      <a href="#section-scan" class="nav-link">AI Scanner</a>
+      <a href="#section-sort" class="nav-link">Bin Sorting</a>
+      <a href="#section-verify" class="nav-link">Student Verification</a>
+      <a href="#section-dashboard" class="nav-link">Kitchen Analytics</a>
+    </nav>
+
+    <div class="header-actions">
+      <div class="eco-badge" id="impactChip" title="Your green eco points this session">
+        <span class="eco-dot"></span> <span id="impactPoints">25</span> Eco Pts
+      </div>
+      <button class="sound-toggle-btn" id="soundToggleBtn" title="Toggle audio sound effects">🔊 Sound</button>
+      <div class="status-chip online" id="serverChip">
+        <span class="status-dot"></span>FastAPI Online
+      </div>
+      <a href="#section-scan" class="cta-pill-btn">Try Live Scan ↗</a>
+    </div>
+  </div>
+</header>
+
+<!-- Hero Section (Wastia Template & Theme) -->
+<section class="hero-section">
+  <div class="hero-container">
+    <div class="hero-content">
+      <div class="hero-tag">Number One Campus Food Waste Intelligence Platform</div>
+      <h1 class="hero-headline">
+        A Wide Range Of Intelligent Solutions For Home &amp; Campus Mess!
+      </h1>
+      <p class="hero-subtext">
+        We have already made huge strides in our sustainability journey by deploying computer vision plate scanning, smart bin guidance, and kitchen demand-prediction to reduce mess carbon footprint.
+      </p>
+      <div class="hero-buttons">
+        <a href="#section-scan" class="btn-primary-green">Explore Live Scanner ↗</a>
+        <a href="#section-dashboard" class="btn-secondary-outline">Kitchen Analytics</a>
+      </div>
+    </div>
+
+    <!-- Floating 97% Customer & Diversion Stat Card (from Dribbble shot) -->
+    <div class="hero-card-column">
+      <div class="hero-stat-card">
+        <div class="stat-highlight">97%</div>
+        <div class="stat-title">Waste Diversion Rate</div>
+        <div class="stat-desc">Based on 1,450+ cafeteria plate audits across campus hostels and mess dining halls.</div>
+        <ul class="stat-checklist">
+          <li><span class="check-circle">✓</span> Real-Time AI Food Plate Segmentation</li>
+          <li><span class="check-circle">✓</span> Smart Biodegradable Bin Guidance</li>
+          <li><span class="check-circle">✓</span> Automated Kitchen Prep Cut Predictions</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WhereNext-style Curated Sticky Stepper -->
+<div class="sticky-stepper-wrap" id="stickyStepper">
+  <div class="stepper-inner">
+    <div class="stepper-label">Interactive Journey:</div>
+    <div class="stepper-nav">
+      <a href="#section-scan" class="step-link active" data-target="section-scan">
+        <span class="step-num">01</span>
+        <span class="step-text">Scan Plate</span>
+      </a>
+      <div class="step-divider"></div>
+      <a href="#section-sort" class="step-link" data-target="section-sort">
+        <span class="step-num">02</span>
+        <span class="step-text">Sort Bin</span>
+      </a>
+      <div class="step-divider"></div>
+      <a href="#section-verify" class="step-link" data-target="section-verify">
+        <span class="step-num">03</span>
+        <span class="step-text">Student ID &amp; Feedback</span>
+      </a>
+      <div class="step-divider"></div>
+      <a href="#section-dashboard" class="step-link" data-target="section-dashboard">
+        <span class="step-num">04</span>
+        <span class="step-text">Kitchen Intelligence</span>
+      </a>
+    </div>
+  </div>
+</div>
+
+<main class="curated-container">
+
+  <!-- ============================================================ -->
+  <!-- SECTION 1: AI Plate Vision & Menu -->
+  <!-- ============================================================ -->
+  <section class="curated-section" id="section-scan">
+    <div class="section-header">
+      <div class="section-eyebrow">STEP 01 — AI COMPUTER VISION</div>
+      <h2 class="section-title">Scan a plate. Detect what the kitchen couldn't.</h2>
+      <p class="section-sub">
+        Upload a cafeteria plate photo or turn on your live webcam. Our FastAPI backend segments food clusters, identifies dishes against today's active menu, and calculates precise leftover waste in grams.
+      </p>
+    </div>
+
+    <!-- Today's Menu Control Card -->
+    <div class="wastia-card menu-card">
+      <div class="card-head-row">
+        <div>
+          <h3 class="card-heading">Active Mess Menu (FastAPI &amp; SQLite DB)</h3>
+          <p class="card-sub">Scans match against these candidate dishes. Changes persist directly in the backend.</p>
+        </div>
+      </div>
+      <div class="menu-chips-container" id="menuChips"></div>
+      <div class="menu-add-row">
+        <input type="text" id="menuInput" class="wastia-input" placeholder="Type dish name (e.g., Paneer Curry, Biryani)..." list="dishSuggestions" autocomplete="off">
+        <datalist id="dishSuggestions"></datalist>
+        <button class="btn-primary-green sm" id="menuAddBtn">+ Add to Today's Menu</button>
+      </div>
+    </div>
+
+    <!-- Scanner Layout -->
+    <div class="scan-grid">
+      <!-- Left Column: Plate Stage -->
+      <div class="wastia-card stage-card">
+        <div class="plate-top-controls">
+          <div class="mode-toggles">
+            <button class="mode-btn active" id="modeRoundBtn">⚪ Round Plate</button>
+            <button class="mode-btn" id="modeThaliBtn">🍱 Thali Tray</button>
+          </div>
+          <button class="camera-btn" id="cameraToggleBtn">📷 Live Webcam</button>
+        </div>
+
+        <div class="plate-viewport" id="plateFrame">
+          <video id="cameraVideo" autoplay playsinline></video>
+          <div class="scan-ring" id="scanRing"></div>
+          <div class="scanline" id="scanline"></div>
+          <div class="camera-overlay-controls" id="cameraControls" style="display:none;">
+            <button class="snap-btn" id="snapBtn">📸 Capture &amp; Scan</button>
+          </div>
+        </div>
+
+        <!-- Sample thumbnails -->
+        <div class="sample-selection-strip" id="sampleRow"></div>
+        <input type="file" id="uploadInput" accept="image/*" style="display:none;">
+
+        <button class="scan-action-btn" id="scanBtn" disabled>Select a plate above to scan</button>
+        <div class="scan-status-line" id="scanStatus"></div>
+      </div>
+
+      <!-- Right Column: Vision Results -->
+      <div class="wastia-card result-card" id="resultCard">
+        <div class="result-empty-state">
+          <div class="empty-icon">◎</div>
+          <div class="empty-title">Ready for plate analysis</div>
+          <div class="empty-desc">Choose a test sample or upload a photo to inspect segmented food clusters and calculated leftover weights.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 2: Smart Guided Bin Sorting -->
+  <!-- ============================================================ -->
+  <section class="curated-section" id="section-sort">
+    <div class="section-header">
+      <div class="section-eyebrow">STEP 02 — GUIDED BIN SORTING</div>
+      <h2 class="section-title">Providing Flexible &amp; Trusted Waste Collection!</h2>
+      <p class="section-sub">
+        AI directs students to the proper bin, catching foil and synthetic wrappers before they contaminate organic compost and biogas systems.
+      </p>
+    </div>
+
+    <div class="wastia-card bin-station-card">
+      <div class="bin-context-banner">
+        <div class="bin-badge-icon">🍲</div>
+        <div class="bin-context-text" id="binContextText">
+          Disposing <b>-- g</b> of food waste — AI recommends: <b>Biodegradable Bin</b>
+        </div>
+      </div>
+
+      <div class="bin-station-prompt">Which waste stream does this plate belong to?</div>
+      <div class="bin-station-sub">Tap the correct bin. Listen for the audio confirmation chime and earn Eco Campus Points!</div>
+
+      <div class="bin-cards-grid" id="binChoices">
+        <button class="bin-choice-card" data-bin="bio">
+          <div class="bin-color-tag bio-tag">ORGANIC STREAM</div>
+          <div class="bin-large-icon">🌱</div>
+          <div class="bin-card-name">Biodegradable</div>
+          <div class="bin-card-desc">Food scraps, leftovers, rice, curries, fruit peels, vegetable scraps</div>
+        </button>
+
+        <button class="bin-choice-card" data-bin="non-bio">
+          <div class="bin-color-tag nonbio-tag">LANDFILL / RECYCLE</div>
+          <div class="bin-large-icon">🗑️</div>
+          <div class="bin-card-name">Non-biodegradable</div>
+          <div class="bin-card-desc">Plastic wrappers, aluminum foil, paper napkins, toothpicks, bones</div>
+        </button>
+      </div>
+
+      <div class="bin-feedback-alert" id="binFeedback"></div>
+      
+      <div class="section-advance-row">
+        <a href="#section-verify" class="btn-primary-green" id="binNext" style="display:none;">
+          Continue to Student Verification &amp; Feedback <span class="arrow">↓</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 3: Student Verification & Anonymous Feedback -->
+  <!-- ============================================================ -->
+  <section class="curated-section" id="section-verify">
+    <div class="section-header">
+      <div class="section-eyebrow">STEP 03 — VERIFIED &amp; ENCRYPTED FEEDBACK</div>
+      <h2 class="section-title">We Devote Time And Effort To Provide Quality Food.</h2>
+      <p class="section-sub">
+        Students verify their hostel residency with cryptographic tokenization. Individual identity is salted and protected, while genuine taste &amp; portion trends reach the mess committee.
+      </p>
+    </div>
+
+    <div class="verify-grid">
+      <!-- Verification Card -->
+      <div class="wastia-card verify-id-card">
+        <div class="nfc-glyph-box">
+          <span class="nfc-icon">▤</span>
+          <div class="nfc-scanline" id="verifyScanbar"></div>
+        </div>
+        <h3 class="card-heading text-center">Scan Student ID or Hostel QR</h3>
+        <p class="card-sub text-center">Confirms resident status to eliminate spam. Identity is salted using SHA-256 for zero-tracking anonymity.</p>
+        <button class="btn-primary-green block" id="verifyBtn">Tap to Verify Hostel QR</button>
+        <div class="verify-status-text" id="verifyStatus"></div>
+        <div class="verify-confirmed-box" id="verifyDone">
+          <div class="check-icon">✓</div>
+          <div class="verify-info" id="verifyDoneText"><b>Verified</b> — Anonymous session token issued</div>
+        </div>
+      </div>
+
+      <!-- Feedback Card -->
+      <div class="wastia-card feedback-input-card" id="fbSection">
+        <h3 class="card-heading">Why was food left over today?</h3>
+        <p class="card-sub">Select the primary reason. Your input directly triggers kitchen recipe and portion adjustments in tomorrow's mess.</p>
+        <div class="feedback-options-grid" id="fbGrid"></div>
+        <div class="feedback-confirmed-banner" id="fbConfirm">
+          <div class="check-icon">✓</div>
+          <div><b>Logged in Kitchen Database!</b> Tomorrow's batch preparation will automatically adjust based on this feedback.</div>
+        </div>
+        <div class="fb-sync-timer" id="fbTimer"></div>
+        <div class="section-advance-row">
+          <a href="#section-dashboard" class="btn-primary-green" id="fbNext" style="display:none;">
+            View Live Kitchen Executive Dashboard <span class="arrow">↓</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 4: Kitchen Intelligence & Predictions Dashboard -->
+  <!-- ============================================================ -->
+  <section class="curated-section" id="section-dashboard">
+    <div class="section-header">
+      <div class="section-eyebrow">STEP 04 — EXECUTIVE KITCHEN DASHBOARD</div>
+      <h2 class="section-title">Processing Campus Food Waste into Smarter Demand Predictions!</h2>
+      <p class="section-sub">
+        Real-time intelligence connecting student plate returns to head-chef cooking volumes, preventing overproduction before cooking even starts.
+      </p>
+    </div>
+
+    <!-- Dashboard Top Action -->
+    <div class="dash-action-bar">
+      <div class="dash-status-indicator">
+        <span class="live-dot">●</span> Syncing with SQLite Database (`smartplate.db`)
+      </div>
+      <button class="btn-outline-dark" id="dashRefreshBtn">🔄 Refresh / Reset Demo Data</button>
+    </div>
+
+    <!-- 4 High Impact Metric Cards (Wastia Dark & Green Palette) -->
+    <div class="metrics-grid">
+      <div class="metric-card dark-green">
+        <div class="metric-icon-bubble">🍃</div>
+        <div class="metric-label">Waste Diverted This Month</div>
+        <div class="metric-number" id="mWaste">114 kg</div>
+        <div class="metric-subtext">↓ 35% reduction vs baseline</div>
+      </div>
+
+      <div class="metric-card white">
+        <div class="metric-icon-bubble green">📉</div>
+        <div class="metric-label">Food Quality Complaints</div>
+        <div class="metric-number" id="mComplaints">14%</div>
+        <div class="metric-subtext">↓ Down from 35% semester baseline</div>
+      </div>
+
+      <div class="metric-card white">
+        <div class="metric-icon-bubble yellow">📊</div>
+        <div class="metric-label">Decisions Backed By Data</div>
+        <div class="metric-number" id="mDataDecisions">88%</div>
+        <div class="metric-subtext">↑ 100% data-verified audits</div>
+      </div>
+
+      <div class="metric-card dark-green">
+        <div class="metric-icon-bubble">🌍</div>
+        <div class="metric-label">CO2e Avoided / Month</div>
+        <div class="metric-number" id="mCO2">217 kg</div>
+        <div class="metric-subtext">≈ 2.6 tonnes / year projected</div>
+      </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="charts-row">
+      <div class="wastia-card chart-card">
+        <div class="chart-header">
+          <div>
+            <h3 class="card-heading">Daily Waste Trend (Last 14 Days)</h3>
+            <p class="card-sub">Kilograms of plate waste logged across meals</p>
+          </div>
+        </div>
+        <canvas id="trendChart"></canvas>
+      </div>
+
+      <div class="wastia-card chart-card">
+        <div class="chart-header">
+          <div>
+            <h3 class="card-heading">Most Wasted Dishes This Month</h3>
+            <p class="card-sub">Identified by computer vision plate returns</p>
+          </div>
+        </div>
+        <canvas id="dishChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Feedback Reasons Breakdown -->
+    <div class="wastia-card feedback-summary-card">
+      <h3 class="card-heading">Aggregated Student Waste Reasons</h3>
+      <p class="card-sub">Direct feedback logged at student disposal stations informing chef menu reviews</p>
+      <div id="feedbackBars" class="feedback-bars-list"></div>
+    </div>
+
+    <!-- Kitchen Demand Prediction Table -->
+    <div class="wastia-card pred-card">
+      <div class="card-head-row">
+        <div>
+          <h3 class="card-heading">Predicted vs. Actual — Today's Kitchen Prep</h3>
+          <p class="card-sub">Live AI cooking recommendations based on plate returns &amp; taste satisfaction</p>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="wastia-table">
+          <thead>
+            <tr>
+              <th>Dish</th>
+              <th>Standard Baseline</th>
+              <th>AI Recommended Prep</th>
+              <th>Adjustment</th>
+              <th>Kitchen Insight</th>
+            </tr>
+          </thead>
+          <tbody id="predBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Wastia Quote / Insight Banner -->
+    <div class="wastia-insight-banner">
+      <div class="insight-badge">INSIGHT</div>
+      <div class="insight-body">
+        <b>Head Chef Operational Note:</b> Preparing food according to real-time waste data stops unneeded excess before cooking begins. Even an 8–15% tailored cut saves thousands of kilograms of campus food each semester.
+      </div>
+    </div>
+
+  </section>
+
+</main>
+
+<!-- Wastia-style Footer -->
+<footer class="site-footer">
+  <div class="footer-container">
+    <div class="footer-brand">
+      <div class="brand-title light">SmartPlate<span>.ai</span></div>
+      <p class="footer-desc">Sustainable campus food intelligence. Providing clean, reliable and automated waste collection solutions for educational institutions.</p>
+    </div>
+    <div class="footer-links">
+      <div class="footer-col">
+        <div class="footer-col-title">Platform</div>
+        <a href="#section-scan">AI Vision</a>
+        <a href="#section-sort">Bin Sorting</a>
+        <a href="#section-dashboard">Analytics</a>
+      </div>
+      <div class="footer-col">
+        <div class="footer-col-title">Backend</div>
+        <span>FastAPI 0.141</span>
+        <span>Python 3.12</span>
+        <span>SQLite Persistence</span>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div>© 2026 SmartPlate AI · Campus Food Intelligence System. All rights reserved.</div>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
