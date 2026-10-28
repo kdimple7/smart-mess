@@ -78,6 +78,31 @@ def init_db():
     )
     """)
 
+    # IoT Hardware Telemetry
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS iot_telemetry (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        weight_g REAL NOT NULL,
+        bin_fill_pct INTEGER NOT NULL,
+        chute_angle INTEGER DEFAULT 0,
+        rfid_card TEXT DEFAULT 'NONE',
+        logged_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # Hostel Floor Leaderboard
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS hostel_leaderboard (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        hostel_block TEXT UNIQUE NOT NULL,
+        total_students INTEGER NOT NULL,
+        avg_waste_g REAL NOT NULL,
+        eco_points INTEGER NOT NULL,
+        streak_days INTEGER NOT NULL,
+        rank INTEGER NOT NULL
+    )
+    """)
+
     conn.commit()
 
     # Seed baseline dishes if empty
@@ -113,6 +138,22 @@ def init_db():
     c.execute("SELECT COUNT(*) FROM scans")
     if c.fetchone()[0] == 0:
         seed_historical_scans(conn)
+
+    # Seed hostel leaderboard if empty
+    c.execute("SELECT COUNT(*) FROM hostel_leaderboard")
+    if c.fetchone()[0] == 0:
+        seed_leaderboard = [
+            ("Block A — Kaveri Bhavan", 140, 18.2, 1250, 6, 1),
+            ("Block C — Nilgiri Hostel", 165, 24.5, 980, 4, 2),
+            ("Block B — Vindhya Hall", 150, 31.8, 790, 2, 3),
+            ("Block D — Shivalik Wing", 135, 42.1, 540, 1, 4),
+            ("Day Scholars Common Dining", 210, 48.6, 420, 0, 5)
+        ]
+        c.executemany("""
+            INSERT OR IGNORE INTO hostel_leaderboard (hostel_block, total_students, avg_waste_g, eco_points, streak_days, rank)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, seed_leaderboard)
+        conn.commit()
 
     conn.close()
 
@@ -335,10 +376,14 @@ def get_analytics():
 
     conn.close()
 
+    diverted_kg = max(total_kg, 114.5)
     return {
-        "total_kg_diverted": max(total_kg, 114.5),
+        "total_kg_diverted": diverted_kg,
         "total_scans": scan_count,
-        "co2_saved_kg": round(max(total_kg, 114.5) * 1.9, 1),
+        "co2_saved_kg": round(diverted_kg * 1.9, 1),
+        "cost_saved_inr": int(diverted_kg * 140), # ₹140 avg ingredients cost per kg
+        "water_saved_liters": int(diverted_kg * 1850), # 1,850L virtual water footprint / kg
+        "meals_recovered": int(diverted_kg / 0.35), # 350g standard student plate portion
         "quality_complaint_pct": 14,
         "days": days,
         "trend_kg": waste_kg,
@@ -346,6 +391,46 @@ def get_analytics():
         "feedback_breakdown": feedback_breakdown,
         "prep_recommendations": prep_recommendations
     }
+
+def save_iot_telemetry(weight_g: float, bin_fill_pct: int, chute_angle: int = 0, rfid: str = "NONE"):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO iot_telemetry (weight_g, bin_fill_pct, chute_angle, rfid_card)
+        VALUES (?, ?, ?, ?)
+    """, (weight_g, bin_fill_pct, chute_angle, rfid))
+    conn.commit()
+    conn.close()
+
+def get_latest_iot_telemetry():
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        SELECT * FROM iot_telemetry
+        ORDER BY id DESC LIMIT 1
+    """)
+    row = c.fetchone()
+    conn.close()
+    if row:
+        return dict(row)
+    return {
+        "weight_g": 0.0,
+        "bin_fill_pct": 35,
+        "chute_angle": 0,
+        "rfid_card": "NONE",
+        "logged_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+
+def get_leaderboard():
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        SELECT * FROM hostel_leaderboard
+        ORDER BY avg_waste_g ASC
+    """)
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return rows
 
 def reset_and_seed():
     if os.path.exists(DB_PATH):

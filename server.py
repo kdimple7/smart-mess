@@ -49,6 +49,12 @@ class FeedbackSubmit(BaseModel):
 class VerifyRequest(BaseModel):
     id_payload: str
 
+class IoTTelemetryPayload(BaseModel):
+    weight_g: float
+    bin_fill_pct: int
+    chute_angle: Optional[int] = 0
+    rfid: Optional[str] = "NONE"
+
 # --- API Endpoints ---
 
 @app.get("/api/health")
@@ -167,9 +173,31 @@ def submit_feedback(payload: FeedbackSubmit):
 def get_dashboard_analytics():
     """
     Returns aggregated 14-day trend, top wasted dishes, student feedback distribution,
-    and dynamic kitchen cooking recommendations.
+    financial / ecological savings, and dynamic kitchen cooking recommendations.
     """
     return database.get_analytics()
+
+@app.post("/api/iot/telemetry")
+def log_iot_telemetry(payload: IoTTelemetryPayload):
+    """
+    Ingests live sensor readings from physical ESP32/Arduino smart hopper or Web Serial API.
+    """
+    database.save_iot_telemetry(payload.weight_g, payload.bin_fill_pct, payload.chute_angle or 0, payload.rfid or "NONE")
+    return {"status": "success", "logged": payload.dict()}
+
+@app.get("/api/iot/telemetry")
+def get_iot_telemetry():
+    """
+    Fetches the most recent hardware station telemetry (load cell, ultrasonic sensor, servo state).
+    """
+    return database.get_latest_iot_telemetry()
+
+@app.get("/api/leaderboard")
+def get_campus_leaderboard():
+    """
+    Fetches the Clean Plate Club hostel floor and branch waste rankings.
+    """
+    return database.get_leaderboard()
 
 @app.post("/api/seed")
 def seed_demo():
