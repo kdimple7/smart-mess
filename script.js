@@ -106,10 +106,19 @@ function addImpactPoints(pts) {
   }
 }
 
-// Check Backend Health
+// Check Backend Health & Edge AI Status
 async function checkServerStatus() {
   const chip = document.getElementById('serverChip');
   if (!chip) return;
+
+  // On GitHub Pages (static host), our in-browser Canvas Computer Vision engine runs client-side
+  if (window.location.hostname.includes('github.io')) {
+    chip.className = 'status-chip online';
+    chip.innerHTML = '<span class="status-dot"></span>Client Edge AI (Active)';
+    chip.title = 'Running real-time in-browser Canvas Computer Vision & IoT simulation';
+    return;
+  }
+
   try {
     const res = await fetch(`${API_BASE}/api/health`, { cache: 'no-store' });
     if (res.ok) {
@@ -119,8 +128,10 @@ async function checkServerStatus() {
       throw new Error('Server not ready');
     }
   } catch (e) {
-    chip.className = 'status-chip offline';
-    chip.innerHTML = '<span class="status-dot" style="background:#EF4444;"></span>Backend Offline';
+    // If local FastAPI server is not started, show standalone Edge AI mode instead of scary red offline error
+    chip.className = 'status-chip online';
+    chip.innerHTML = '<span class="status-dot"></span>Client Edge AI (Active)';
+    chip.title = 'Local FastAPI offline — operating in standalone browser vision mode';
   }
 }
 
