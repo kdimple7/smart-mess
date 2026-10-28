@@ -6,6 +6,24 @@ from datetime import datetime, timedelta
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "smartplate.db")
 
+# --- Food-Related Feedback Specification ---
+REASONS_SPEC = {
+    # Taste & cooking (kitchen can fix)
+    "too_salty": {"group": "Taste & cooking", "label": "Too salty", "insight": "check seasoning & salt balance"},
+    "too_spicy": {"group": "Taste & cooking", "label": "Too spicy", "insight": "reduce chili & spice level"},
+    "too_bland": {"group": "Taste & cooking", "label": "Bland / needs seasoning", "insight": "enhance seasoning & aromatics"},
+    "undercooked": {"group": "Taste & cooking", "label": "Undercooked", "insight": "extend cooking & simmering duration"},
+    "overcooked": {"group": "Taste & cooking", "label": "Overcooked / dry", "insight": "shorten cooking time, retain moisture"},
+    "served_cold": {"group": "Taste & cooking", "label": "Served cold", "insight": "verify warmer tray temperature"},
+    "stale_old": {"group": "Taste & cooking", "label": "Stale / not fresh", "insight": "stale food reported, rotate batches"},
+    # Menu feedback
+    "dislike_dish": {"group": "Menu feedback", "label": "Don't like this dish", "insight": "dish unpopular, review menu recipe"},
+    # Safety
+    "safety_issue": {"group": "Safety", "label": "Bad smell / foreign object", "insight": "SAFETY ALERT: inspect kitchen & ingredients"}
+}
+
+REASON_GROUPS = ["Taste & cooking", "Menu feedback", "Safety"]
+
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -40,6 +58,16 @@ def init_db():
     )
     """)
 
+    # Menu history (tracks menu frequency for automatic repeat detection)
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS menu_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        dish_name TEXT NOT NULL,
+        served_date DATE NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
     # Scans
     c.execute("""
     CREATE TABLE IF NOT EXISTS scans (
@@ -67,16 +95,68 @@ def init_db():
     )
     """)
 
-    # Student feedback
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS feedback (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        scan_id TEXT,
-        student_token TEXT,
-        reason TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
+    # --- Safe Migration for Feedback Table ---
+    c.execute("PRAGMA table_info(feedback)")
+    cols = [col[1] for col in c.fetchall()]
+    
+    if not cols:
+        # Table does not exist yet -> create with new schema
+        c.execute("""
+        CREATE TABLE IF NOT EXISTS feedback (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_token TEXT,
+            dish_id INTEGER,
+            dish_name TEXT NOT NULL,
+            reason_code TEXT NOT NULL,
+            reason_group TEXT NOT NULL,
+            leftover_grams INTEGER,
+            scan_id TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+    elif "reason_code" not in cols or "dish_name" not in cols:
+        # Table exists with legacy columns -> perform safe migration
+        c.execute("""
+        CREATE TABLE feedback_v2 (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_token TEXT,
+            dish_id INTEGER,
+            dish_name TEXT NOT NULL,
+            reason_code TEXT NOT NULL,
+            reason_group TEXT NOT NULL,
+            leftover_grams INTEGER,
+            scan_id TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+
+        c.execute("SELECT * FROM feedback")
+        old_rows = c.fetchall()
+        for r in old_rows:
+            old_reason = (r["reason"] if "reason" in r.keys() else "").lower()
+            token = r["student_token"] if "student_token" in r.keys() else "anon"
+            scan_id = r["scan_id"] if "scan_id" in r.keys() else None
+            created = r["created_at"] if "created_at" in r.keys() else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            # Map legacy reasons
+            if "taste" in old_reason:
+                code = "dislike_dish"
+                group = "Menu feedback"
+            elif "quality" in old_reason:
+                code = "undercooked"
+                group = "Taste & cooking"
+            else:
+                code = "legacy"
+                group = "Legacy"
+
+            c.execute("""
+                INSERT INTO feedback_v2 (id, session_token, dish_name, reason_code, reason_group, scan_id, created_at)
+                VALUES (?, ?, 'Campus Meal', ?, ?, ?, ?)
+            """, (r["id"], token, code, group, scan_id, created))
+
+        c.execute("DROP TABLE feedback")
+        c.execute("ALTER TABLE feedback_v2 RENAME TO feedback")
+        conn.commit()
 
     # IoT Hardware Telemetry
     c.execute("""
@@ -134,7 +214,7 @@ def init_db():
             c.execute("INSERT OR IGNORE INTO menu_today (dish_name) VALUES (?)", (dish,))
         conn.commit()
 
-    # Seed historical scans if empty
+    # Seed historical scans, menu history & feedback if empty
     c.execute("SELECT COUNT(*) FROM scans")
     if c.fetchone()[0] == 0:
         seed_historical_scans(conn)
@@ -160,25 +240,63 @@ def init_db():
 def seed_historical_scans(conn):
     c = conn.cursor()
     base_date = datetime.now() - timedelta(days=14)
-    sample_records = [
-        ("Chowmein", 42, "Portion was too large"),
-        ("Rajma Chawal", 35, "Didn't like the taste"),
-        ("Roti / Chapati", 28, "Portion was too large"),
-        ("Poha", 22, "Quality issue"),
-        ("Steamed Rice", 38, "Portion was too large"),
-        ("Dal Tadka", 18, "Menu repeated too often"),
-        ("Idli & Chutney", 25, "Quality issue"),
-        ("Chowmein", 36, "Health or diet reason"),
-        ("Rajma Chawal", 30, "Portion was too large"),
-        ("Poha", 19, "Other reason")
+
+    # 1. Seed Menu History for the past 7 days (detects repeat frequency automatically)
+    today = datetime.now().date()
+    history_entries = [
+        # Paneer Butter Masala served 4 times in last 7 days -> triggers repeat_flag!
+        ("Paneer Butter Masala", today - timedelta(days=6)),
+        ("Paneer Butter Masala", today - timedelta(days=4)),
+        ("Paneer Butter Masala", today - timedelta(days=2)),
+        ("Paneer Butter Masala", today),
+        # Chowmein served 3 times in last 7 days -> triggers repeat_flag!
+        ("Chowmein", today - timedelta(days=5)),
+        ("Chowmein", today - timedelta(days=3)),
+        ("Chowmein", today),
+        # Other regular dishes
+        ("Rajma Chawal", today - timedelta(days=6)),
+        ("Rajma Chawal", today - timedelta(days=1)),
+        ("Poha", today - timedelta(days=5)),
+        ("Poha", today - timedelta(days=2)),
+        ("Idli & Chutney", today - timedelta(days=4)),
+        ("Idli & Chutney", today - timedelta(days=1)),
+        ("Dal Tadka", today - timedelta(days=3)),
+        ("Dal Tadka", today),
+        ("Steamed Rice", today - timedelta(days=2)),
+        ("Steamed Rice", today)
+    ]
+    for dish_name, s_date in history_entries:
+        c.execute("""
+            INSERT INTO menu_history (dish_name, served_date)
+            VALUES (?, ?)
+        """, (dish_name, s_date.strftime("%Y-%m-%d")))
+
+    # 2. Seed Scans and Per-Dish Food Feedback with New Standard Codes
+    sample_scans = [
+        ("Chowmein", 42, "too_salty", "Taste & cooking"),
+        ("Rajma Chawal", 35, "too_spicy", "Taste & cooking"),
+        ("Roti / Chapati", 28, "overcooked", "Taste & cooking"),
+        ("Poha", 22, "served_cold", "Taste & cooking"),
+        ("Steamed Rice", 38, "undercooked", "Taste & cooking"),
+        ("Dal Tadka", 45, "too_salty", "Taste & cooking"),
+        ("Idli & Chutney", 25, "stale_old", "Taste & cooking"),
+        ("Aloo Gobi Sabzi", 36, "dislike_dish", "Menu feedback"),
+        ("Dal Tadka", 30, "too_salty", "Taste & cooking"),
+        ("Chowmein", 34, "too_spicy", "Taste & cooking"),
+        ("Dal Tadka", 26, "too_salty", "Taste & cooking"),
+        ("Paneer Butter Masala", 31, "too_bland", "Taste & cooking"),
+        ("Dal Tadka", 20, "safety_issue", "Safety"), # Safety alert
+        ("Chowmein", 18, "safety_issue", "Safety")   # Safety alert
     ]
 
     for day in range(14):
         scan_date = (base_date + timedelta(days=day)).strftime("%Y-%m-%d %H:%M:%S")
         for i in range(2):
             scan_id = f"seed-d{day}-s{i}"
-            item = sample_records[(day * 2 + i) % len(sample_records)]
-            grams = item[1] + ((day * 3) % 15)
+            item = sample_scans[(day * 2 + i) % len(sample_scans)]
+            dish_name, base_g, reason_code, reason_grp = item
+            grams = base_g + ((day * 3) % 15)
+
             c.execute("""
                 INSERT INTO scans (id, image_name, total_grams, bin_recommended, contaminant_detected, created_at)
                 VALUES (?, ?, ?, 'bio', 0, ?)
@@ -188,12 +306,12 @@ def seed_historical_scans(conn):
             c.execute("""
                 INSERT INTO scan_items (scan_id, dish_name, grams, confidence, bbox_json, match_type)
                 VALUES (?, ?, ?, 92, ?, 'vision')
-            """, (scan_id, item[0], grams, bbox))
+            """, (scan_id, dish_name, grams, bbox))
 
             c.execute("""
-                INSERT INTO feedback (scan_id, student_token, reason, created_at)
-                VALUES (?, ?, ?, ?)
-            """, (scan_id, f"tok-{day}-{i}", item[2], scan_date))
+                INSERT INTO feedback (session_token, dish_name, reason_code, reason_group, leftover_grams, scan_id, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (f"tok-{day}-{i}", dish_name, reason_code, reason_grp, grams, scan_id, scan_date))
 
     conn.commit()
 
@@ -235,10 +353,11 @@ def add_menu_item(name, photo_url=None):
     conn = get_connection()
     c = conn.cursor()
     name = name.strip()
-    # ensure in dishes
     c.execute("INSERT OR IGNORE INTO dishes (name) VALUES (?)", (name,))
-    # add to menu
     c.execute("INSERT OR REPLACE INTO menu_today (dish_name, photo_url) VALUES (?, ?)", (name, photo_url))
+    # Record to menu_history for today
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    c.execute("INSERT INTO menu_history (dish_name, served_date) VALUES (?, ?)", (name, today_str))
     conn.commit()
     conn.close()
     return get_menu_today()
@@ -269,15 +388,73 @@ def save_scan_result(scan_id, image_name, total_grams, bin_recommended, is_conta
     conn.commit()
     conn.close()
 
-def save_feedback(scan_id, token_hash, reason):
+def save_feedback_items(session_token: str, items: list, scan_id: str = None):
+    """
+    Saves a list of per-dish feedback items.
+    Validates reason codes and limits one submission per dish per session per meal (last 4 hours).
+    """
     conn = get_connection()
     c = conn.cursor()
-    c.execute("""
-        INSERT INTO feedback (scan_id, student_token, reason)
-        VALUES (?, ?, ?)
-    """, (scan_id, token_hash, reason))
+    saved = []
+    skipped = []
+
+    for item in items:
+        dish_name = item.get("dish_name", "").strip()
+        reason_code = item.get("reason_code", "").strip()
+        dish_id = item.get("dish_id")
+        leftover_grams = item.get("leftover_grams")
+
+        if reason_code not in REASONS_SPEC:
+            continue
+
+        group = REASONS_SPEC[reason_code]["group"]
+
+        # Limit one submission per dish per session per meal (within last 4 hours)
+        c.execute("""
+            SELECT id FROM feedback
+            WHERE session_token = ? AND dish_name = ?
+              AND created_at >= DATETIME('now', '-4 hours')
+        """, (session_token, dish_name))
+        if c.fetchone():
+            skipped.append(dish_name)
+            continue
+
+        c.execute("""
+            INSERT INTO feedback (session_token, dish_id, dish_name, reason_code, reason_group, leftover_grams, scan_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (session_token, dish_id, dish_name, reason_code, group, leftover_grams, scan_id))
+        saved.append({"dish_name": dish_name, "reason_code": reason_code, "group": group})
+
     conn.commit()
     conn.close()
+    return {"saved": saved, "skipped": skipped}
+
+def save_feedback(scan_id, token_hash, reason, dish_name="Campus Meal"):
+    """Backward compatibility helper"""
+    return save_feedback_items(token_hash, [{"dish_name": dish_name, "reason_code": reason}], scan_id)
+
+def get_repeat_flagged_dishes(conn=None):
+    """
+    Detects menu repetition automatically:
+    Flags any dish that appeared 3 or more times in the last 7 days.
+    """
+    should_close = False
+    if conn is None:
+        conn = get_connection()
+        should_close = True
+    c = conn.cursor()
+    c.execute("""
+        SELECT dish_name, COUNT(*) as count
+        FROM menu_history
+        WHERE served_date >= DATE('now', '-7 days')
+        GROUP BY dish_name
+        HAVING count >= 3
+        ORDER BY count DESC
+    """)
+    rows = [dict(r) for r in c.fetchall()]
+    if should_close:
+        conn.close()
+    return rows
 
 def get_analytics():
     conn = get_connection()
@@ -303,7 +480,6 @@ def get_analytics():
         days.append(r["day"].split("-")[-1] if r["day"] else "D")
         waste_kg.append(r["kg"])
 
-    # If fewer than 14 points, pad
     if len(days) < 14:
         missing = 14 - len(days)
         pad_days = [f"D{i+1}" for i in range(missing)]
@@ -311,7 +487,7 @@ def get_analytics():
         days = pad_days + days
         waste_kg = pad_kg + waste_kg
 
-    # 3. Most wasted dishes
+    # 3. Most wasted dishes from CV scan items
     c.execute("""
         SELECT dish_name, ROUND(SUM(grams)/1000.0, 2) as total_kg, COUNT(*) as count
         FROM scan_items
@@ -321,19 +497,79 @@ def get_analytics():
     """)
     dish_waste_rows = [dict(r) for r in c.fetchall()]
 
-    # 4. Feedback breakdown
+    # 4. Aggregated Student Feedback Breakdown
     c.execute("""
-        SELECT reason, COUNT(*) as count
+        SELECT reason_code, reason_group, COUNT(*) as count
         FROM feedback
-        GROUP BY reason
+        WHERE reason_code != 'legacy'
+        GROUP BY reason_code, reason_group
         ORDER BY count DESC
     """)
-    feedback_rows = [dict(r) for r in c.fetchall()]
-    total_fb = sum(r["count"] for r in feedback_rows) or 1
-    feedback_breakdown = [
-        {"reason": r["reason"], "count": r["count"], "pct": round((r["count"] / total_fb) * 100)}
-        for r in feedback_rows
-    ]
+    fb_rows = c.fetchall()
+    total_valid_fb = sum(r["count"] for r in fb_rows) or 1
+    
+    feedback_breakdown = []
+    feedback_by_group = {"Taste & cooking": [], "Menu feedback": [], "Safety": []}
+    for r in fb_rows:
+        code = r["reason_code"]
+        grp = r["reason_group"]
+        spec = REASONS_SPEC.get(code, {"label": code.replace("_", " ").title(), "group": grp})
+        pct = round((r["count"] / total_valid_fb) * 100)
+        item = {
+            "code": code,
+            "label": spec["label"],
+            "group": spec.get("group", grp),
+            "count": r["count"],
+            "pct": pct
+        }
+        feedback_breakdown.append(item)
+        if item["group"] in feedback_by_group:
+            feedback_by_group[item["group"]].append(item)
+
+    # Per-dish feedback breakdown for drill-down
+    c.execute("""
+        SELECT dish_name, reason_code, COUNT(*) as count
+        FROM feedback
+        WHERE reason_code != 'legacy'
+        GROUP BY dish_name, reason_code
+        ORDER BY dish_name ASC, count DESC
+    """)
+    dish_fb_rows = c.fetchall()
+    feedback_by_dish = {}
+    dish_fb_totals = {}
+    for r in dish_fb_rows:
+        dname = r["dish_name"]
+        dish_fb_totals[dname] = dish_fb_totals.get(dname, 0) + r["count"]
+
+    for r in dish_fb_rows:
+        dname = r["dish_name"]
+        code = r["reason_code"]
+        spec = REASONS_SPEC.get(code, {"label": code.replace("_", " ").title(), "group": "Taste & cooking"})
+        tot = dish_fb_totals.get(dname, 1)
+        if dname not in feedback_by_dish:
+            feedback_by_dish[dname] = []
+        feedback_by_dish[dname].append({
+            "code": code,
+            "label": spec["label"],
+            "group": spec.get("group", "Taste & cooking"),
+            "count": r["count"],
+            "pct": round((r["count"] / tot) * 100)
+        })
+
+    # Safety alert count & list
+    c.execute("""
+        SELECT dish_name, leftover_grams, created_at
+        FROM feedback
+        WHERE reason_code = 'safety_issue'
+        ORDER BY created_at DESC
+        LIMIT 5
+    """)
+    safety_alerts = [dict(r) for r in c.fetchall()]
+    safety_issues_count = len(safety_alerts)
+
+    # Repeat flagged dishes (>= 3 times in last 7 days)
+    repeat_flag_rows = get_repeat_flagged_dishes(conn)
+    repeat_flags = {r["dish_name"]: r["count"] for r in repeat_flag_rows}
 
     # 5. Smart kitchen cooking recommendation table for today's menu
     c.execute("""
@@ -346,33 +582,57 @@ def get_analytics():
     """)
     menu_rows = c.fetchall()
     prep_recommendations = []
+    
     for r in menu_rows:
         name = r["dish_name"]
         wasted_g = r["wasted_grams_today"]
         h = sum(ord(ch) * (i + 1) for i, ch in enumerate(name)) % 16
         baseline_kg = 20 + h
 
+        # RULE: Prep volume recommendations COME ONLY FROM MEASURED LEFTOVER GRAMS
         if wasted_g == 0:
-            rec = {
-                "dish": name,
-                "baseline": f"{baseline_kg} kg",
-                "recommended": f"{baseline_kg} kg",
-                "change": "↔ awaiting scan data",
-                "status": "warn",
-                "reason": "Cook standard baseline"
-            }
+            recommended_kg = baseline_kg
+            change = "↔ 0% (standard)"
+            status = "good"
         else:
-            reduction_pct = min(22, max(3, round((wasted_g / 150.0) * 8)))
-            pred_kg = round(baseline_kg * (1 - reduction_pct / 100.0), 1)
-            rec = {
-                "dish": name,
-                "baseline": f"{baseline_kg} kg",
-                "recommended": f"{pred_kg} kg",
-                "change": f"↓ {reduction_pct}%",
-                "status": "good",
-                "reason": f"High plate leftover logged ({wasted_g}g observed)"
-            }
-        prep_recommendations.append(rec)
+            reduction_pct = min(22, max(5, round((wasted_g / 140.0) * 8)))
+            recommended_kg = round(baseline_kg * (1 - reduction_pct / 100.0), 1)
+            change = f"↓ {reduction_pct}%"
+            status = "warn" if reduction_pct >= 10 else "good"
+
+        # RULE: Kitchen Insight uses reasons & repeat_flag (never changes prep volume)
+        insight_parts = []
+        
+        # 1. Repeat flag insight
+        if name in repeat_flags:
+            count = repeat_flags[name]
+            insight_parts.append(f"{name} served {count} times this week, consider rotating")
+
+        # 2. Recipe quality insight from reasons
+        dish_reasons = feedback_by_dish.get(name, [])
+        if dish_reasons:
+            top_r = dish_reasons[0]
+            code = top_r["code"]
+            pct = top_r["pct"]
+            spec = REASONS_SPEC.get(code, {})
+            action = spec.get("insight", "check seasoning")
+            label = top_r["label"]
+            insight_parts.append(f"{pct}% say {label.lower()}, {action}")
+        elif not insight_parts:
+            insight_parts.append("Nominal feedback; recipe quality approved")
+
+        kitchen_insight = " · ".join(insight_parts)
+
+        prep_recommendations.append({
+            "dish": name,
+            "baseline": f"{baseline_kg} kg",
+            "recommended": f"{recommended_kg} kg",
+            "change": change,
+            "status": status,
+            "reason": kitchen_insight, # Kitchen Insight column
+            "repeat_flag": name in repeat_flags,
+            "repeat_count": repeat_flags.get(name, 0)
+        })
 
     conn.close()
 
@@ -381,14 +641,19 @@ def get_analytics():
         "total_kg_diverted": diverted_kg,
         "total_scans": scan_count,
         "co2_saved_kg": round(diverted_kg * 1.9, 1),
-        "cost_saved_inr": int(diverted_kg * 140), # ₹140 avg ingredients cost per kg
-        "water_saved_liters": int(diverted_kg * 1850), # 1,850L virtual water footprint / kg
-        "meals_recovered": int(diverted_kg / 0.35), # 350g standard student plate portion
+        "cost_saved_inr": int(diverted_kg * 140),
+        "water_saved_liters": int(diverted_kg * 1850),
+        "meals_recovered": int(diverted_kg / 0.35),
         "quality_complaint_pct": 14,
         "days": days,
         "trend_kg": waste_kg,
         "top_dishes": dish_waste_rows,
         "feedback_breakdown": feedback_breakdown,
+        "feedback_by_group": feedback_by_group,
+        "feedback_by_dish": feedback_by_dish,
+        "safety_issues_count": safety_issues_count,
+        "safety_alerts": safety_alerts,
+        "repeat_flagged": repeat_flag_rows,
         "prep_recommendations": prep_recommendations
     }
 

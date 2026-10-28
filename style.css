@@ -1416,6 +1416,276 @@ a {
   color: var(--forest-deep);
 }
 
+/* ============================================================
+   PER-DISH FEEDBACK SYSTEM (FOOD-RELATED ONLY)
+   ============================================================ */
+.dish-feedback-container {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin: 18px 0;
+}
+
+.dish-feedback-card {
+  background: #F8FAF9;
+  border: 1.5px solid var(--border-light);
+  border-radius: 14px;
+  padding: 18px 20px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.dish-feedback-card.has-selection {
+  border-color: var(--green-primary);
+  background: #FFFFFF;
+  box-shadow: var(--shadow-sm);
+}
+
+.dish-fb-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.dish-fb-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text-dark);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dish-fb-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: #B45309;
+  background: #FEF3C7;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+}
+
+.dish-fb-badge.scanned {
+  color: #15803D;
+  background: #DCFCE7;
+}
+
+.dish-group-block {
+  margin-bottom: 12px;
+}
+
+.dish-group-block:last-child {
+  margin-bottom: 0;
+}
+
+.dish-group-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dish-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dish-chip {
+  background: #FFFFFF;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-pill);
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-dark);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.dish-chip:hover {
+  background: #F0FDF4;
+  border-color: var(--green-vivid);
+  transform: translateY(-1px);
+}
+
+.dish-chip.active {
+  background: #DCFCE7;
+  border-color: var(--green-primary);
+  color: var(--forest-deep);
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(21, 128, 61, 0.15);
+}
+
+.dish-chip.safety {
+  border-color: #FECACA;
+  background: #FFF5F5;
+}
+
+.dish-chip.safety:hover {
+  border-color: #EF4444;
+  background: #FEE2E2;
+}
+
+.dish-chip.safety.active {
+  background: #FEE2E2;
+  border-color: #DC2626;
+  color: #991B1B;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.2);
+}
+
+.feedback-action-row {
+  margin-top: 14px;
+}
+
+#fbSubmitBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ============================================================
+   RED SAFETY ALERT BANNER
+   ============================================================ */
+.safety-alert-banner {
+  background: linear-gradient(135deg, #FEF2F2, #FEE2E2);
+  border: 1.5px solid #F87171;
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.12);
+  animation: popIn 0.3s ease;
+}
+
+.safety-alert-icon {
+  font-size: 28px;
+  line-height: 1;
+  animation: pulseLed 1.5s infinite;
+}
+
+.safety-alert-content {
+  flex: 1;
+}
+
+.safety-alert-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: #991B1B;
+  margin-bottom: 2px;
+}
+
+.safety-alert-desc {
+  font-size: 13px;
+  color: #B91C1C;
+  line-height: 1.4;
+}
+
+.safety-alert-badge {
+  background: #DC2626;
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+/* ============================================================
+   DISH FILTER DRILL-DOWN PILLS (DASHBOARD)
+   ============================================================ */
+.dish-filter-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0 20px 0;
+}
+
+.dish-filter-pill {
+  background: #F1F5F9;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-pill);
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dish-filter-pill:hover {
+  background: #E2E8F0;
+  color: var(--text-dark);
+}
+
+.dish-filter-pill.active {
+  background: var(--forest);
+  color: #FFFFFF;
+  border-color: var(--forest);
+  box-shadow: 0 2px 6px rgba(15, 56, 44, 0.2);
+}
+
+.group-title-banner {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--forest-light);
+  background: #EDF7F2;
+  padding: 6px 12px;
+  border-radius: 6px;
+  margin: 18px 0 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.group-title-banner.safety-group {
+  background: #FEF2F2;
+  color: #991B1B;
+}
+
+.group-title-banner.menu-group {
+  background: #FEF9C3;
+  color: #854D0E;
+}
+
+.fb-bar-group-tag {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  text-transform: uppercase;
+}
+
+.fb-bar-group-tag.safety {
+  background: #FEE2E2;
+  color: #DC2626;
+}
+
+.fb-bar-group-tag.menu {
+  background: #FEF3C7;
+  color: #B45309;
+}
+
 .feedback-confirmed-banner {
   display: none;
   margin-top: 20px;

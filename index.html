@@ -391,12 +391,21 @@
 
       <!-- Feedback Card -->
       <div class="wastia-card feedback-input-card" id="fbSection">
-        <h3 class="card-heading">Why was food left over today?</h3>
-        <p class="card-sub">Select the primary reason. Your input directly triggers kitchen recipe and portion adjustments in tomorrow's mess.</p>
-        <div class="feedback-options-grid" id="fbGrid"></div>
+        <h3 class="card-heading">Which dish was left over, and why?</h3>
+        <p class="card-sub">Select what went wrong for each dish. Your feedback directly alerts chefs to adjust recipe seasoning, temperature, or cooking time.</p>
+        
+        <!-- Per-Dish Feedback Container -->
+        <div id="dishFeedbackContainer" class="dish-feedback-container">
+          <!-- Dynamically populated per detected dish (or active menu) with grouped chips -->
+        </div>
+
+        <div class="feedback-action-row" id="fbActionRow">
+          <button class="btn-primary-green block" id="fbSubmitBtn" disabled>Select at least one reason to submit</button>
+        </div>
+
         <div class="feedback-confirmed-banner" id="fbConfirm">
           <div class="check-icon">✓</div>
-          <div><b>Logged in Kitchen Database!</b> Tomorrow's batch preparation will automatically adjust based on this feedback.</div>
+          <div><b>Logged in Kitchen Database!</b> Tomorrow's batch recipe &amp; preparation will adjust based on this feedback.</div>
         </div>
         <div class="fb-sync-timer" id="fbTimer"></div>
         <div class="section-advance-row">
@@ -426,6 +435,16 @@
         <span class="live-dot">●</span> Syncing with SQLite Database (`smartplate.db`)
       </div>
       <button class="btn-outline-dark" id="dashRefreshBtn">🔄 Refresh / Reset Demo Data</button>
+    </div>
+
+    <!-- Red Kitchen Safety Alert (Visible when safety_issue reports exist) -->
+    <div class="safety-alert-banner" id="safetyAlertBanner" style="display:none;">
+      <div class="safety-alert-icon">🚨</div>
+      <div class="safety-alert-content">
+        <div class="safety-alert-title" id="safetyAlertTitle">Critical Kitchen Food Safety Alert</div>
+        <div class="safety-alert-desc" id="safetyAlertDesc">Immediate kitchen inspection required: Foreign object or bad smell reported by students today.</div>
+      </div>
+      <span class="safety-alert-badge">CHEF ACTION REQUIRED</span>
     </div>
 
     <!-- 6 High Impact Metric Cards (Environmental & Financial Impact) -->
@@ -498,8 +517,16 @@
 
     <!-- Feedback Reasons Breakdown -->
     <div class="wastia-card feedback-summary-card">
-      <h3 class="card-heading">Aggregated Student Waste Reasons</h3>
-      <p class="card-sub">Direct feedback logged at student disposal stations informing chef menu reviews</p>
+      <div class="card-head-row">
+        <div>
+          <h3 class="card-heading">Aggregated Student Waste Reasons</h3>
+          <p class="card-sub">Grouped by Taste &amp; Cooking, Menu, and Safety — with per-dish drill-down filter</p>
+        </div>
+      </div>
+      
+      <!-- Dish Filter Drill-Down Pills -->
+      <div class="dish-filter-pills" id="dishFilterPills"></div>
+
       <div id="feedbackBars" class="feedback-bars-list"></div>
     </div>
 

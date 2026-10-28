@@ -1038,8 +1038,41 @@ function initStep2() {
 }
 
 // ============================================================
-// STEP 3 — Student Verification & Feedback
+// STEP 4 — Student Verification & Per-Dish Food Feedback
 // ============================================================
+const FOOD_REASON_GROUPS = [
+  {
+    key: 'taste_cooking',
+    name: 'Taste & Cooking',
+    icon: '👨‍🍳',
+    reasons: [
+      { code: 'too_salty', label: 'Too salty' },
+      { code: 'too_spicy', label: 'Too spicy' },
+      { code: 'too_bland', label: 'Bland / needs seasoning' },
+      { code: 'undercooked', label: 'Undercooked' },
+      { code: 'overcooked', label: 'Overcooked / dry' },
+      { code: 'served_cold', label: 'Served cold' },
+      { code: 'stale_old', label: 'Stale / not fresh' }
+    ]
+  },
+  {
+    key: 'menu',
+    name: 'Menu Feedback',
+    icon: '📋',
+    reasons: [
+      { code: 'dislike_dish', label: "Don't like this dish" }
+    ]
+  },
+  {
+    key: 'safety',
+    name: 'Safety',
+    icon: '⚠️',
+    reasons: [
+      { code: 'safety_issue', label: 'Bad smell / foreign object', isSafety: true }
+    ]
+  }
+];
+
 function initStep3() {
   const verifyBtn = document.getElementById('verifyBtn');
   const status = document.getElementById('verifyStatus');
@@ -1048,8 +1081,8 @@ function initStep3() {
   verifyBtn?.addEventListener('click', async () => {
     verifyBtn.disabled = true;
     verifyBtn.textContent = 'Verifying ID…';
-    scanbar.classList.add('on');
-    status.textContent = 'Reading student RFID / Hostel QR…';
+    scanbar?.classList.add('on');
+    if (status) status.textContent = 'Reading student RFID / Hostel QR…';
     playSound('scan');
 
     let verifyResponse = { token: 'anon-' + Math.random().toString(36).substr(2, 8), anonymous_id: 'Student-A749B2' };
@@ -1065,70 +1098,180 @@ function initStep3() {
     } catch (e) {}
 
     setTimeout(() => {
-      status.textContent = 'Salting & hashing with SHA-256…';
+      if (status) status.textContent = 'Salting & hashing with SHA-256…';
     }, 450);
 
     setTimeout(() => {
       SmartPlateState.studentToken = verifyResponse.token;
-      status.textContent = 'Identity authenticated in 0.9s';
+      if (status) status.textContent = 'Identity authenticated in 0.9s';
       playSound('success');
-      document.getElementById('verifyDoneText').innerHTML = `<b>Verified as ${verifyResponse.anonymous_id}</b> — identity protected`;
-      document.getElementById('verifyDone').classList.add('show');
-      document.getElementById('fbSection').classList.add('show');
+      const doneText = document.getElementById('verifyDoneText');
+      if (doneText) doneText.innerHTML = `<b>Verified as ${verifyResponse.anonymous_id}</b> — identity protected`;
+      document.getElementById('verifyDone')?.classList.add('show');
+      document.getElementById('fbSection')?.classList.add('show');
       verifyBtn.style.display = 'none';
-      buildFeedbackOptions();
+      buildPerDishFeedbackUI();
     }, 900);
   });
+}
 
-  function buildFeedbackOptions() {
-    const reasons = [
-      'Portion was too large',
-      'Didn\'t like the taste',
-      'Quality issue',
-      'Health or diet reason',
-      'Menu repeated too often',
-      'Other reason'
-    ];
-    const grid = document.getElementById('fbGrid');
-    grid.innerHTML = '';
-    reasons.forEach(r => {
-      const b = document.createElement('button');
-      b.className = 'fb-option';
-      b.textContent = r;
-      b.addEventListener('click', async () => {
-        document.querySelectorAll('.fb-option').forEach(o => o.classList.remove('picked'));
-        b.classList.add('picked');
-        playSound('success');
-        addImpactPoints(10);
+function buildPerDishFeedbackUI() {
+  const container = document.getElementById('dishFeedbackContainer');
+  const submitBtn = document.getElementById('fbSubmitBtn');
+  if (!container) return;
+  container.innerHTML = '';
 
-        try {
-          await fetch(`${API_BASE}/api/feedback`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              scan_id: (SmartPlateState.sample && SmartPlateState.sample.id) || 'adhoc',
-              token: SmartPlateState.studentToken,
-              reason: r
-            })
-          });
-        } catch (e) {}
-
-        document.getElementById('fbConfirm').classList.add('show');
-        document.getElementById('fbTimer').textContent = 'Synced with kitchen database · +10 Eco Points';
-        document.getElementById('fbNext').style.display = 'inline-flex';
-        // Auto-refresh step 4 analytics in background
-        renderDashboardData();
-      });
-      grid.appendChild(b);
-    });
+  // 1. Identify Candidate Dishes (Max 3 from scan, or fallback to active menu)
+  let candidateDishes = [];
+  if (SmartPlateState.sample && SmartPlateState.sample.detections && SmartPlateState.sample.detections.length) {
+    candidateDishes = SmartPlateState.sample.detections.slice(0, 3).map(d => ({
+      name: d.name,
+      grams: d.grams
+    }));
   }
+  if (!candidateDishes.length) {
+    const menu = SmartPlateState.todaysMenu && SmartPlateState.todaysMenu.length
+      ? SmartPlateState.todaysMenu
+      : [{ name: 'Chowmein' }, { name: 'Rajma Chawal' }, { name: 'Poha' }];
+    candidateDishes = menu.slice(0, 3).map(d => ({
+      name: d.name,
+      grams: null
+    }));
+  }
+
+  // Active selections: map dish_name -> { dish_name, reason_code, leftover_grams }
+  const selectedReasons = {};
+
+  candidateDishes.forEach((dish, idx) => {
+    const card = document.createElement('div');
+    card.className = 'dish-feedback-card';
+    card.id = `dishCard_${idx}`;
+
+    const head = document.createElement('div');
+    head.className = 'dish-fb-head';
+
+    const title = document.createElement('div');
+    title.className = 'dish-fb-title';
+    title.innerHTML = `<span>🍲</span> <span>${dish.name}</span>`;
+
+    const badge = document.createElement('span');
+    badge.className = `dish-fb-badge ${dish.grams ? 'scanned' : ''}`;
+    badge.textContent = dish.grams ? `${dish.grams}g leftover` : 'Active Menu Item';
+
+    head.appendChild(title);
+    head.appendChild(badge);
+    card.appendChild(head);
+
+    FOOD_REASON_GROUPS.forEach(grp => {
+      const grpBlock = document.createElement('div');
+      grpBlock.className = 'dish-group-block';
+
+      const grpTitle = document.createElement('div');
+      grpTitle.className = 'dish-group-title';
+      grpTitle.innerHTML = `${grp.icon} ${grp.name}`;
+      grpBlock.appendChild(grpTitle);
+
+      const chipRow = document.createElement('div');
+      chipRow.className = 'dish-chip-row';
+
+      grp.reasons.forEach(r => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = `dish-chip ${r.isSafety ? 'safety' : ''}`;
+        chip.dataset.dish = dish.name;
+        chip.dataset.code = r.code;
+        chip.textContent = r.label;
+
+        chip.addEventListener('click', () => {
+          const isCurrentActive = chip.classList.contains('active');
+          // Deselect all chips in this dish's card
+          card.querySelectorAll('.dish-chip').forEach(c => c.classList.remove('active'));
+
+          if (isCurrentActive) {
+            delete selectedReasons[dish.name];
+            card.classList.remove('has-selection');
+          } else {
+            chip.classList.add('active');
+            card.classList.add('has-selection');
+            selectedReasons[dish.name] = {
+              dish_name: dish.name,
+              reason_code: r.code,
+              leftover_grams: dish.grams
+            };
+            playSound('scan');
+          }
+          updateSubmitBtn();
+        });
+
+        chipRow.appendChild(chip);
+      });
+
+      grpBlock.appendChild(chipRow);
+      card.appendChild(grpBlock);
+    });
+
+    container.appendChild(card);
+  });
+
+  function updateSubmitBtn() {
+    if (!submitBtn) return;
+    const count = Object.keys(selectedReasons).length;
+    if (count > 0) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = `Submit Feedback (${count} dish${count > 1 ? 'es' : ''}) →`;
+    } else {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Select at least one reason above to submit';
+    }
+  }
+
+  submitBtn?.replaceWith(submitBtn.cloneNode(true));
+  const newSubmitBtn = document.getElementById('fbSubmitBtn');
+
+  newSubmitBtn?.addEventListener('click', async () => {
+    const items = Object.values(selectedReasons);
+    if (!items.length) return;
+
+    newSubmitBtn.disabled = true;
+    newSubmitBtn.textContent = 'Recording in Kitchen Database…';
+
+    try {
+      await fetch(`${API_BASE}/api/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scan_id: (SmartPlateState.sample && SmartPlateState.sample.id) || 'adhoc',
+          token: SmartPlateState.studentToken,
+          items: items
+        })
+      });
+    } catch (e) {
+      console.warn('Backend feedback sync offline fallback:', e);
+    }
+
+    document.getElementById('fbConfirm')?.classList.add('show');
+    const timerEl = document.getElementById('fbTimer');
+    if (timerEl) {
+      timerEl.textContent = `Synced ${items.length} dish feedback item(s) with kitchen database · +10 Eco Points`;
+    }
+    const nextBtn = document.getElementById('fbNext');
+    if (nextBtn) nextBtn.style.display = 'inline-flex';
+    newSubmitBtn.style.display = 'none';
+
+    playSound('success');
+    addImpactPoints(10);
+
+    // Refresh step 5 analytics
+    renderDashboardData();
+  });
 }
 
 // ============================================================
-// STEP 4 — Live Kitchen Intelligence Dashboard
+// STEP 5 — Live Kitchen Intelligence Dashboard
 // ============================================================
 let trendChartInstance = null;
 let dishChartInstance = null;
+let currentDishFilter = 'all';
 
 async function initStep4() {
   document.getElementById('dashRefreshBtn')?.addEventListener('click', async () => {
@@ -1156,6 +1299,9 @@ async function renderDashboardData() {
     data = {
       total_kg_diverted: 114.5,
       co2_saved_kg: 217.0,
+      cost_saved_inr: 16030,
+      water_saved_liters: 211800,
+      meals_recovered: 327,
       quality_complaint_pct: 14,
       days: ['D1','D2','D3','D4','D5','D6','D7','D8','D9','D10','D11','D12','D13','D14'],
       trend_kg: [15, 14.5, 16, 13.8, 12.5, 13, 11.2, 10.8, 10.1, 9.4, 9.8, 8.7, 8.5, 7.9],
@@ -1167,21 +1313,74 @@ async function renderDashboardData() {
         { dish_name: 'Poha', total_kg: 14.0 }
       ],
       feedback_breakdown: [
-        { reason: 'Portion was too large', count: 24, pct: 48 },
-        { reason: 'Didn\'t like the taste', count: 12, pct: 24 },
-        { reason: 'Quality issue', count: 7, pct: 14 },
-        { reason: 'Menu repeated too often', count: 4, pct: 8 },
-        { reason: 'Health or diet reason', count: 3, pct: 6 }
+        { code: 'too_salty', label: 'Too salty', group: 'Taste & cooking', count: 28, pct: 36 },
+        { code: 'too_spicy', label: 'Too spicy', group: 'Taste & cooking', count: 18, pct: 23 },
+        { code: 'undercooked', label: 'Undercooked', group: 'Taste & cooking', count: 12, pct: 15 },
+        { code: 'dislike_dish', label: "Don't like this dish", group: 'Menu feedback', count: 9, pct: 12 },
+        { code: 'served_cold', label: 'Served cold', group: 'Taste & cooking', count: 6, pct: 8 },
+        { code: 'safety_issue', label: 'Bad smell / foreign object', group: 'Safety', count: 2, pct: 6 }
+      ],
+      feedback_by_group: {
+        'Taste & cooking': [
+          { code: 'too_salty', label: 'Too salty', count: 28, pct: 44 },
+          { code: 'too_spicy', label: 'Too spicy', count: 18, pct: 28 },
+          { code: 'undercooked', label: 'Undercooked', count: 12, pct: 19 },
+          { code: 'served_cold', label: 'Served cold', count: 6, pct: 9 }
+        ],
+        'Menu feedback': [
+          { code: 'dislike_dish', label: "Don't like this dish", count: 9, pct: 100 }
+        ],
+        'Safety': [
+          { code: 'safety_issue', label: 'Bad smell / foreign object', count: 2, pct: 100 }
+        ]
+      },
+      feedback_by_dish: {
+        'Dal Tadka': [
+          { code: 'too_salty', label: 'Too salty', count: 18, pct: 60 },
+          { code: 'safety_issue', label: 'Bad smell / foreign object', count: 1, pct: 10 }
+        ],
+        'Rajma Chawal': [
+          { code: 'too_spicy', label: 'Too spicy', count: 14, pct: 58 },
+          { code: 'too_salty', label: 'Too salty', count: 5, pct: 21 }
+        ],
+        'Steamed Rice': [
+          { code: 'undercooked', label: 'Undercooked', count: 10, pct: 50 },
+          { code: 'served_cold', label: 'Served cold', count: 4, pct: 20 }
+        ],
+        'Chowmein': [
+          { code: 'too_spicy', label: 'Too spicy', count: 8, pct: 44 },
+          { code: 'safety_issue', label: 'Bad smell / foreign object', count: 1, pct: 8 }
+        ]
+      },
+      safety_issues_count: 2,
+      safety_alerts: [
+        { dish_name: 'Dal Tadka', created_at: 'Today 12:45 PM' },
+        { dish_name: 'Chowmein', created_at: 'Today 01:15 PM' }
       ],
       prep_recommendations: [
-        { dish: 'Chowmein', baseline: '25 kg', recommended: '21.5 kg', change: '↓ 14%', status: 'good', reason: 'Consistently high plate leftovers' },
-        { dish: 'Poha', baseline: '18 kg', recommended: '16.5 kg', change: '↓ 8%', status: 'good', reason: 'Moderate breakfast leftovers' },
-        { dish: 'Idli & Chutney', baseline: '22 kg', recommended: '20.5 kg', change: '↓ 7%', status: 'good', reason: 'High satisfaction, minor portion excess' },
-        { dish: 'Rajma Chawal', baseline: '30 kg', recommended: '25.5 kg', change: '↓ 15%', status: 'good', reason: 'Portion size re-calibration recommended' }
+        { dish: 'Dal Tadka', baseline: '26 kg', recommended: '21.5 kg', change: '↓ 17%', status: 'warn', reason: '60% say too salty, check seasoning & salt balance', repeat_flag: false },
+        { dish: 'Rajma Chawal', baseline: '30 kg', recommended: '25.0 kg', change: '↓ 16%', status: 'warn', reason: '58% say too spicy, reduce chili & spice level', repeat_flag: false },
+        { dish: 'Paneer Butter Masala', baseline: '24 kg', recommended: '24.0 kg', change: '↔ 0%', status: 'good', reason: 'Paneer Butter Masala served 4 times this week, consider rotating', repeat_flag: true },
+        { dish: 'Steamed Rice', baseline: '28 kg', recommended: '24.5 kg', change: '↓ 12%', status: 'good', reason: '50% say undercooked, extend cooking & simmering duration', repeat_flag: false }
       ]
     };
   }
 
+  // 1. Red Food Safety Alert Banner
+  const safetyBanner = document.getElementById('safetyAlertBanner');
+  const safetyDesc = document.getElementById('safetyAlertDesc');
+  if (safetyBanner) {
+    if (data.safety_issues_count > 0) {
+      safetyBanner.style.display = 'flex';
+      if (safetyDesc) {
+        safetyDesc.innerHTML = `Immediate inspection required: <b>${data.safety_issues_count} food safety report(s)</b> logged (Bad smell / foreign object). Chef station review advised.`;
+      }
+    } else {
+      safetyBanner.style.display = 'none';
+    }
+  }
+
+  // 2. High Impact Metrics
   const mWaste = document.getElementById('mWaste');
   const mCO2 = document.getElementById('mCO2');
   const mComplaints = document.getElementById('mComplaints');
@@ -1196,7 +1395,7 @@ async function renderDashboardData() {
   if (mWaterSaved) mWaterSaved.textContent = `${(data.water_saved_liters || Math.round(data.total_kg_diverted * 1850)).toLocaleString()} L`;
   if (mMealsSaved) mMealsSaved.textContent = `${data.meals_recovered || Math.round(data.total_kg_diverted / 0.35)} Meals`;
 
-  // Clean Plate Club Leaderboard
+  // 3. Clean Plate Club Leaderboard
   const leaderboardBody = document.getElementById('leaderboardBody');
   if (leaderboardBody) {
     let leaderboard = [
@@ -1232,7 +1431,7 @@ async function renderDashboardData() {
     }).join('');
   }
 
-  // Trend Chart
+  // 4. Trend Chart
   const trendCtx = document.getElementById('trendChart');
   if (trendCtx && window.Chart) {
     if (trendChartInstance) trendChartInstance.destroy();
@@ -1262,7 +1461,7 @@ async function renderDashboardData() {
     });
   }
 
-  // Dish Chart
+  // 5. Dish Chart
   const dishCtx = document.getElementById('dishChart');
   if (dishCtx && window.Chart) {
     if (dishChartInstance) dishChartInstance.destroy();
@@ -1288,30 +1487,118 @@ async function renderDashboardData() {
     });
   }
 
-  // Feedback breakdown bars
+  // 6. Aggregated Student Feedback Breakdown with Per-Dish Drill-Down Filter
   const fbWrap = document.getElementById('feedbackBars');
-  if (fbWrap && data.feedback_breakdown) {
-    fbWrap.innerHTML = data.feedback_breakdown.map(fb => `
-      <div class="fb-bar-row">
-        <div class="fb-bar-label" title="${fb.reason}">${fb.reason}</div>
-        <div class="fb-bar-track"><div class="fb-bar-fill" style="width:${fb.pct}%"></div></div>
-        <div class="fb-bar-pct">${fb.pct}%</div>
-      </div>
-    `).join('');
+  const pillsContainer = document.getElementById('dishFilterPills');
+
+  function renderFilteredFeedback() {
+    if (!fbWrap) return;
+    fbWrap.innerHTML = '';
+
+    if (currentDishFilter === 'all') {
+      const groups = data.feedback_by_group || {};
+      let html = '';
+      const groupOrder = ['Taste & cooking', 'Menu feedback', 'Safety'];
+
+      groupOrder.forEach(grpName => {
+        const items = groups[grpName] || [];
+        if (!items.length) return;
+        const isSafety = grpName.toLowerCase().includes('safety');
+        const isMenu = grpName.toLowerCase().includes('menu');
+        const badgeClass = isSafety ? 'safety-group' : (isMenu ? 'menu-group' : '');
+        const icon = isSafety ? '⚠️' : (isMenu ? '📋' : '👨‍🍳');
+
+        html += `<div class="group-title-banner ${badgeClass}">${icon} ${grpName}</div>`;
+        items.forEach(fb => {
+          const barColor = isSafety ? '#DC2626' : (isMenu ? '#EAB308' : 'var(--green-vivid)');
+          html += `
+            <div class="fb-bar-row">
+              <div class="fb-bar-label" title="${fb.label || fb.reason}">
+                ${fb.label || fb.reason}
+              </div>
+              <div class="fb-bar-track">
+                <div class="fb-bar-fill" style="width:${fb.pct}%;background:${barColor}"></div>
+              </div>
+              <div class="fb-bar-pct">${fb.pct}% (${fb.count})</div>
+            </div>
+          `;
+        });
+      });
+      fbWrap.innerHTML = html;
+    } else {
+      const dishItems = (data.feedback_by_dish && data.feedback_by_dish[currentDishFilter]) || [];
+      if (!dishItems.length) {
+        fbWrap.innerHTML = `<div style="padding:16px;color:var(--text-muted);font-size:13px;">No feedback logged for <b>${currentDishFilter}</b> yet.</div>`;
+        return;
+      }
+      let html = `<div class="group-title-banner">🍲 Direct Feedback Breakdown: ${currentDishFilter}</div>`;
+      dishItems.forEach(fb => {
+        const isSafety = fb.code === 'safety_issue';
+        const isMenu = fb.group === 'Menu feedback';
+        const barColor = isSafety ? '#DC2626' : (isMenu ? '#EAB308' : 'var(--green-vivid)');
+        html += `
+          <div class="fb-bar-row">
+            <div class="fb-bar-label" title="${fb.label}">
+              ${fb.label}
+            </div>
+            <div class="fb-bar-track">
+              <div class="fb-bar-fill" style="width:${fb.pct}%;background:${barColor}"></div>
+            </div>
+            <div class="fb-bar-pct">${fb.pct}% (${fb.count})</div>
+          </div>
+        `;
+      });
+      fbWrap.innerHTML = html;
+    }
   }
 
-  // Prep predictions table
+  if (pillsContainer) {
+    pillsContainer.innerHTML = '';
+    const allPill = document.createElement('button');
+    allPill.type = 'button';
+    allPill.className = `dish-filter-pill ${currentDishFilter === 'all' ? 'active' : ''}`;
+    allPill.textContent = 'All Dishes (Global)';
+    allPill.addEventListener('click', () => {
+      currentDishFilter = 'all';
+      pillsContainer.querySelectorAll('.dish-filter-pill').forEach(p => p.classList.remove('active'));
+      allPill.classList.add('active');
+      renderFilteredFeedback();
+    });
+    pillsContainer.appendChild(allPill);
+
+    const dishNames = Object.keys(data.feedback_by_dish || {});
+    dishNames.forEach(dname => {
+      const pill = document.createElement('button');
+      pill.type = 'button';
+      pill.className = `dish-filter-pill ${currentDishFilter === dname ? 'active' : ''}`;
+      pill.textContent = dname;
+      pill.addEventListener('click', () => {
+        currentDishFilter = dname;
+        pillsContainer.querySelectorAll('.dish-filter-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        renderFilteredFeedback();
+      });
+      pillsContainer.appendChild(pill);
+    });
+  }
+  renderFilteredFeedback();
+
+  // 7. Kitchen Demand Prediction Table (Volume cuts from grams, insights from reasons & repeat flag)
   const predBody = document.getElementById('predBody');
   if (predBody && data.prep_recommendations) {
-    predBody.innerHTML = data.prep_recommendations.map(p => `
-      <tr>
-        <td><b>${p.dish}</b></td>
-        <td>${p.baseline}</td>
-        <td><b>${p.recommended}</b></td>
-        <td class="pred-diff ${p.status}">${p.change}</td>
-        <td style="font-size:12.5px;color:var(--text-muted);">${p.reason}</td>
-      </tr>
-    `).join('');
+    predBody.innerHTML = data.prep_recommendations.map(p => {
+      const isRepeat = p.repeat_flag;
+      const repeatTag = isRepeat ? `<span class="badge-streak" style="margin-left:6px;font-size:10px;">🔁 3+ DAYS</span>` : '';
+      return `
+        <tr>
+          <td><b>${p.dish}</b> ${repeatTag}</td>
+          <td>${p.baseline}</td>
+          <td><b>${p.recommended}</b></td>
+          <td class="pred-diff ${p.status}">${p.change}</td>
+          <td style="font-size:12.5px;color:var(--text-muted);">${p.reason}</td>
+        </tr>
+      `;
+    }).join('');
   }
 }
 

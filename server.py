@@ -2,7 +2,7 @@ import os
 import time
 import hashlib
 import uuid
-from typing import Optional
+from typing import Optional, List, Union
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -41,10 +41,21 @@ class MenuAdd(BaseModel):
     name: str
     photo_url: Optional[str] = None
 
+class FeedbackItem(BaseModel):
+    dish_id: Optional[int] = None
+    dish_name: Optional[str] = "Campus Meal"
+    reason_code: str
+    leftover_grams: Optional[int] = None
+
 class FeedbackSubmit(BaseModel):
     scan_id: Optional[str] = None
     token: Optional[str] = None
-    reason: str
+    items: Optional[List[FeedbackItem]] = None
+    feedback_items: Optional[List[FeedbackItem]] = None
+    dish_id: Optional[int] = None
+    dish_name: Optional[str] = None
+    reason: Optional[str] = None
+    reason_code: Optional[str] = None
 
 class VerifyRequest(BaseModel):
     id_payload: str
@@ -157,17 +168,60 @@ def verify_student(payload: VerifyRequest):
         "message": "Student identity cryptographically verified & salted"
     }
 
+@app.get("/api/feedback/reasons")
+def get_feedback_reasons():
+    """
+    Returns the valid food-related feedback reason codes, labels, and groups.
+    """
+    return {
+        "groups": database.REASON_GROUPS,
+        "reasons": database.REASONS_SPEC
+    }
+
 @app.post("/api/feedback")
-def submit_feedback(payload: FeedbackSubmit):
+def submit_feedback(payload: Union[FeedbackSubmit, List[FeedbackItem]]):
     """
-    Records student reason for leftover food and updates kitchen intelligence records.
+    Accepts per-dish feedback items, validates against allowed food codes,
+    rejects unknown codes, and enforces one submission per dish per session per meal.
     """
-    database.save_feedback(
-        scan_id=payload.scan_id or "adhoc",
-        token_hash=payload.token or "anon",
-        reason=payload.reason
+    if isinstance(payload, list):
+        items = payload
+        token = "anon"
+        scan_id = "adhoc"
+    else:
+        token = payload.token or "anon"
+        scan_id = payload.scan_id or "adhoc"
+        items = payload.items or payload.feedback_items or []
+        
+        # Backward compatibility for single item payload
+        if not items and (payload.reason_code or payload.reason):
+            code = payload.reason_code or payload.reason
+            dname = payload.dish_name or "Campus Meal"
+            items = [FeedbackItem(dish_id=payload.dish_id, dish_name=dname, reason_code=code)]
+
+    if not items:
+        raise HTTPException(status_code=400, detail="No feedback items provided")
+
+    # Validate all reason codes
+    for it in items:
+        if it.reason_code not in database.REASONS_SPEC:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid reason_code '{it.reason_code}'. Allowed codes: {list(database.REASONS_SPEC.keys())}"
+            )
+
+    result = database.save_feedback_items(
+        session_token=token,
+        items=[it.dict() for it in items],
+        scan_id=scan_id
     )
-    return {"status": "recorded", "message": "Feedback successfully logged"}
+
+    return {
+        "status": "recorded",
+        "message": f"Successfully logged feedback for {len(result['saved'])} dish(es)",
+        "saved": result["saved"],
+        "skipped": result["skipped"]
+    }
 
 @app.get("/api/analytics")
 def get_dashboard_analytics():
