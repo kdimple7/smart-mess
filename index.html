@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=2.2">
+<link rel="stylesheet" href="style.css?v=2.3">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 </head>
 <body>
@@ -27,9 +27,8 @@
 
     <nav class="nav-links">
       <a href="#section-scan" class="nav-link">AI Scanner</a>
-      <a href="#section-iot" class="nav-link">IoT Station</a>
       <a href="#section-sort" class="nav-link">Bin Sorting</a>
-      <a href="#section-verify" class="nav-link">Student ID</a>
+      <a href="#section-verify" class="nav-link">Student Feedback</a>
       <a href="#section-dashboard" class="nav-link">Kitchen Analytics</a>
     </nav>
 
@@ -89,23 +88,18 @@
         <span class="step-text">Scan Plate</span>
       </a>
       <div class="step-divider"></div>
-      <a href="#section-iot" class="step-link" data-target="section-iot">
-        <span class="step-num">02</span>
-        <span class="step-text">IoT Hopper</span>
-      </a>
-      <div class="step-divider"></div>
       <a href="#section-sort" class="step-link" data-target="section-sort">
-        <span class="step-num">03</span>
+        <span class="step-num">02</span>
         <span class="step-text">Sort Bin</span>
       </a>
       <div class="step-divider"></div>
       <a href="#section-verify" class="step-link" data-target="section-verify">
-        <span class="step-num">04</span>
+        <span class="step-num">03</span>
         <span class="step-text">Student Feedback</span>
       </a>
       <div class="step-divider"></div>
       <a href="#section-dashboard" class="step-link" data-target="section-dashboard">
-        <span class="step-num">05</span>
+        <span class="step-num">04</span>
         <span class="step-text">Kitchen &amp; Impact</span>
       </a>
     </div>
@@ -183,140 +177,11 @@
   </section>
 
   <!-- ============================================================ -->
-  <!-- SECTION 2: IoT Smart Mess Hopper & Hardware Station -->
-  <!-- ============================================================ -->
-  <section class="curated-section" id="section-iot">
-    <div class="section-header">
-      <div class="section-eyebrow">STEP 02 — IOT SMART HOPPER &amp; SENSORS</div>
-      <h2 class="section-title">Automated Weight Telemetry &amp; Contaminant Deflector.</h2>
-      <p class="section-sub">
-        Pairing computer vision with physical hardware: an HX711 load cell measures exact food scraps (±1g), an ultrasonic sensor tracks bin capacity, and an automated servo gate diverts contaminants into the proper chute.
-      </p>
-    </div>
-
-    <div class="wastia-card iot-station-card">
-      <!-- Hardware Connection Header Bar -->
-      <div class="iot-control-bar">
-        <div class="iot-device-status">
-          <span class="iot-led" id="iotLed"></span>
-          <span class="iot-status-title" id="iotStatusText">ESP32 Hopper: <b>Simulated Telemetry</b> (Ready)</span>
-        </div>
-        <div class="iot-actions">
-          <button class="btn-outline-dark sm" id="iotConnectSerialBtn">🔌 Connect USB Microcontroller</button>
-          <button class="btn-secondary-outline sm" id="iotSimulateToggleBtn">Simulate Sensor Feed</button>
-        </div>
-      </div>
-
-      <!-- IoT Sensor Grid -->
-      <div class="iot-sensors-grid">
-        <!-- 1. HX711 Load Cell Scale -->
-        <div class="iot-sensor-box">
-          <div class="iot-sensor-header">
-            <span class="sensor-icon">⚖️</span>
-            <div>
-              <div class="sensor-title">HX711 Digital Load Cell</div>
-              <div class="sensor-sub">Ground-Truth Scrap Weight (±1g)</div>
-            </div>
-            <span class="sensor-badge active">LIVE</span>
-          </div>
-          <div class="scale-readout-wrap">
-            <div class="scale-digital" id="scaleDisplay">
-              <span class="scale-digits" id="scaleValue">142.4</span>
-              <span class="scale-unit">grams</span>
-            </div>
-          </div>
-          <div class="scale-controls-row">
-            <button class="btn-sm-action" id="tareScaleBtn">Tare (Zero)</button>
-            <div class="scale-slider-wrap">
-              <label for="scrapSlider">Simulate Waste (g):</label>
-              <input type="range" id="scrapSlider" min="0" max="450" value="142" class="wastia-slider">
-            </div>
-          </div>
-        </div>
-
-        <!-- 2. HC-SR04 Ultrasonic Fill Level -->
-        <div class="iot-sensor-box">
-          <div class="iot-sensor-header">
-            <span class="sensor-icon">📡</span>
-            <div>
-              <div class="sensor-title">HC-SR04 Ultrasonic Sensor</div>
-              <div class="sensor-sub">Compost Bin Volume Capacity</div>
-            </div>
-            <span class="sensor-badge normal" id="fillStatusBadge">NORMAL</span>
-          </div>
-          <div class="bin-fill-visual">
-            <div class="bin-gauge-bar">
-              <div class="bin-gauge-fill" id="binGaugeFill" style="width: 42%;"></div>
-            </div>
-            <div class="bin-gauge-meta">
-              <span id="binFillPercent">42% Filled</span>
-              <span id="binFillDistance">26 cm to top</span>
-            </div>
-          </div>
-          <p class="sensor-note">Housekeeping alert triggers automatically when bin fill exceeds 85%.</p>
-        </div>
-
-        <!-- 3. Micro Servo Automated Diverter Gate -->
-        <div class="iot-sensor-box">
-          <div class="iot-sensor-header">
-            <span class="sensor-icon">⚙️</span>
-            <div>
-              <div class="sensor-title">SG90 Servo Diverter Flap</div>
-              <div class="sensor-sub">Automatic Chute Segregation</div>
-            </div>
-            <span class="sensor-badge angle" id="servoStatusBadge">0° BIO</span>
-          </div>
-          <div class="servo-visual-dial">
-            <div class="servo-arm" id="servoArm"></div>
-            <div class="servo-labels">
-              <span class="chute-label bio-label active" id="labelBio">🌱 Compost Chute (0°)</span>
-              <span class="chute-label land-label" id="labelLandfill">🗑️ Landfill Diverter (90°)</span>
-            </div>
-          </div>
-          <div class="servo-controls">
-            <button class="btn-sm-action" id="servoBioBtn">Compost Chute (0°)</button>
-            <button class="btn-sm-action danger" id="servoLandBtn">Flag Contaminant (90°)</button>
-          </div>
-        </div>
-
-        <!-- 4. RFID / NFC Student Card Tap -->
-        <div class="iot-sensor-box">
-          <div class="iot-sensor-header">
-            <span class="sensor-icon">💳</span>
-            <div>
-              <div class="sensor-title">MFRC522 RFID Card Tap</div>
-              <div class="sensor-sub">Clean Plate Club Reward</div>
-            </div>
-            <span class="sensor-badge rfid" id="rfidBadge">WAITING TAP</span>
-          </div>
-          <div class="rfid-tap-area" id="rfidTapArea" title="Tap to simulate RFID card read">
-            <div class="rfid-pulse"></div>
-            <div class="rfid-icon">🪪</div>
-            <div class="rfid-prompt">Click to Tap Student ID Card</div>
-            <div class="rfid-uid" id="rfidUidText">Card UID: E2806894</div>
-          </div>
-          <div class="rfid-reward-banner" id="rfidRewardBanner" style="display:none;">
-            🎉 <b>Clean Plate Reward!</b> Scrap weight under 20g: <b>+50 Eco Points</b> awarded!
-          </div>
-        </div>
-      </div>
-
-      <!-- IoT Footer row -->
-      <div class="iot-footer-row">
-        <div class="iot-fw-note">
-          <span class="pulse-dot"></span> <b>Microcontroller Firmware Ready:</b> Pre-configured C++ code in <code>iot/esp32_smart_mess.ino</code> with Web Serial API streaming support.
-        </div>
-        <a href="#section-sort" class="btn-primary-green sm">Continue to Guided Sorting ↓</a>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============================================================ -->
-  <!-- SECTION 3: Smart Guided Bin Sorting -->
+  <!-- SECTION 2: Smart Guided Bin Sorting -->
   <!-- ============================================================ -->
   <section class="curated-section" id="section-sort">
     <div class="section-header">
-      <div class="section-eyebrow">STEP 03 — GUIDED BIN SORTING</div>
+      <div class="section-eyebrow">STEP 02 — GUIDED BIN SORTING</div>
       <h2 class="section-title">Providing Flexible &amp; Trusted Waste Collection!</h2>
       <p class="section-sub">
         AI directs students to the proper bin, catching foil and synthetic wrappers before they contaminate organic compost and biogas systems.
@@ -361,11 +226,11 @@
   </section>
 
   <!-- ============================================================ -->
-  <!-- SECTION 4: Student Verification & Anonymous Feedback -->
+  <!-- SECTION 3: Student Verification & Anonymous Feedback -->
   <!-- ============================================================ -->
   <section class="curated-section" id="section-verify">
     <div class="section-header">
-      <div class="section-eyebrow">STEP 04 — VERIFIED &amp; ENCRYPTED FEEDBACK</div>
+      <div class="section-eyebrow">STEP 03 — VERIFIED &amp; ENCRYPTED FEEDBACK</div>
       <h2 class="section-title">We Devote Time And Effort To Provide Quality Food.</h2>
       <p class="section-sub">
         Students verify their hostel residency with cryptographic tokenization. Individual identity is salted and protected, while genuine taste &amp; portion trends reach the mess committee.
@@ -418,11 +283,11 @@
   </section>
 
   <!-- ============================================================ -->
-  <!-- SECTION 5: Kitchen Intelligence & Impact Dashboard -->
+  <!-- SECTION 4: Kitchen Intelligence & Impact Dashboard -->
   <!-- ============================================================ -->
   <section class="curated-section" id="section-dashboard">
     <div class="section-header">
-      <div class="section-eyebrow">STEP 05 — EXECUTIVE KITCHEN &amp; IMPACT DASHBOARD</div>
+      <div class="section-eyebrow">STEP 04 — EXECUTIVE KITCHEN &amp; IMPACT DASHBOARD</div>
       <h2 class="section-title">Processing Campus Food Waste into Smarter Demand Predictions!</h2>
       <p class="section-sub">
         Real-time intelligence connecting student plate returns to head-chef cooking volumes, preventing overproduction before cooking even starts.
@@ -621,6 +486,6 @@
   </div>
 </footer>
 
-<script src="script.js?v=2.2"></script>
+<script src="script.js?v=2.3"></script>
 </body>
 </html>

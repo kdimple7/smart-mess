@@ -115,7 +115,7 @@ async function checkServerStatus() {
   if (window.location.hostname.includes('github.io')) {
     chip.className = 'status-chip online';
     chip.innerHTML = '<span class="status-dot"></span>Client Edge AI (Active)';
-    chip.title = 'Running real-time in-browser Canvas Computer Vision & IoT simulation';
+    chip.title = 'Running real-time in-browser Canvas Computer Vision & Kitchen Intelligence';
     return;
   }
 
@@ -798,6 +798,8 @@ async function initStep1() {
 // STEP 2 — IoT Smart Mess Hopper & Hardware Telemetry
 // ============================================================
 function initStepIoT() {
+  // Gracefully skip when Section 02 IoT Hopper is removed
+  if (!document.getElementById('section-iot')) return;
   let scaleWeight = 142.4;
   let tareOffset = 0;
   let binFill = 42;
